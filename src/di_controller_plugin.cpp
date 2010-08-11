@@ -54,6 +54,7 @@ public:
   ros::Subscriber start_sub_;
   dynamics_identification::Start start_msg_;
   ssize_t active_joint_index_;
+  bool going_up_;
   ros::Time t0_;
   
   ros::Publisher data_pub_;
@@ -65,6 +66,7 @@ DIController::
 DIController()
   : tick_(0),
     active_joint_index_(-1),
+    going_up_(true),
     t0_(ros::Time::now())
 {
 }
@@ -105,6 +107,7 @@ start_cb(dynamics_identification::Start::ConstPtr const & start)
   active_joint_index_ = ij->second;
   tick_ = 0;
   t0_ = ros::Time::now();
+  going_up_ = true;
 }
 
 
@@ -113,10 +116,10 @@ update(void)
 {
   ros::Duration const dt(ros::Time::now() - t0_);
   
+  for (size_t ii(0); ii < ndof_; ++ii) {
+    controlled_joint_[ii]->commanded_effort_ = 0;
+  }
   if (0 > active_joint_index_ ) {
-    for (size_t ii(0); ii < ndof_; ++ii) {
-      controlled_joint_[ii]->commanded_effort_ = 0;
-    }
     return;
   }
   
@@ -126,26 +129,32 @@ update(void)
     data_pub_.publish(data_msg_);
   }
   
+  // motion hysteresis
+  if (going_up_ &&
+      controlled_joint_[active_joint_index_]->position_ >= start_msg_.upper_position) {
+    going_up_ = false;
+  }
+  else if (( ! going_up_) && 
+	   controlled_joint_[active_joint_index_]->position_ <= start_msg_.lower_position) {
+    going_up_ = true;
+  }
+  
   data_msg_.tick[data_index] = tick_;
   data_msg_.milliseconds[data_index] = dt.toNSec() * 1e-6;
-  if (controlled_joint_[active_joint_index_]->position_ >= start_msg_.upper_position) {
-    data_msg_.command_torque[data_index] = - start_msg_.torque_magnitude;
-  }
-  if (controlled_joint_[active_joint_index_]->position_ <= start_msg_.lower_position) {
+  if (going_up_) {
     data_msg_.command_torque[data_index] = start_msg_.torque_magnitude;
+  }
+  else {
+    data_msg_.command_torque[data_index] = - start_msg_.torque_magnitude;
   }
   data_msg_.position[data_index] = controlled_joint_[active_joint_index_]->position_;
   data_msg_.velocity[data_index] = controlled_joint_[active_joint_index_]->velocity_;
   data_msg_.applied_torque[data_index] = controlled_joint_[active_joint_index_]->measured_effort_;
   
-  for (size_t ii(0); ii < ndof_; ++ii) {
-    if (static_cast<ssize_t>(ii) == active_joint_index_) {
-      controlled_joint_[ii]->commanded_effort_ = data_msg_.command_torque[data_index];
-    }
-    else {
-      controlled_joint_[ii]->commanded_effort_ = 0; // XXXX to do: PID on starting position
-    }
-  }
+  controlled_joint_[active_joint_index_]->commanded_effort_ = data_msg_.command_torque[data_index];
+  // XXXX to do: the other joints should be servod to their starting
+  // position or something like that, for now they will just flop
+  // around at zero torque.
   
   ++tick_;
 }

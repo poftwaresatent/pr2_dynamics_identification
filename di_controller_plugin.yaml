@@ -1,2 +1,4 @@
-di_controller_plugin:
+di_controller:
   type: DIController
+  joints:
+    - l_elbow_flex_joint

@@ -1,0 +1,10 @@
+<launch>
+  <rosparam command="load" file="$(find dynamics_identification)/di_controller_plugin.yaml" />
+  <node
+      pkg="pr2_controller_manager"
+      type="spawner"
+      name="di_controller_spawner"
+      args="di_controller"
+      output="screen">
+  </node>
+</launch>

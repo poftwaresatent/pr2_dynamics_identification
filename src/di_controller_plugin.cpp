@@ -31,6 +31,7 @@
 #include <XmlRpcException.h>
 
 using namespace std;
+using namespace boost;
 
 
 class DIController
@@ -175,7 +176,13 @@ init(pr2_mechanism_model::RobotState * robot, ros::NodeHandle & nn)
       string const & name(static_cast<string const &>(joints_value[ii]));
       pr2_mechanism_model::JointState * joint(robot->getJointState(name));
       if ( ! joint) {
-	throw runtime_error("no joint called `" + name + "'");
+	typedef map<string, shared_ptr<urdf::Joint> > jmap_t;
+	jmap_t const & jmap(robot->model_->robot_model_.joints_);
+	ostringstream msg;
+	for (jmap_t::const_iterator ij(jmap.begin()); ij != jmap.end(); ++ij) {
+	  msg << " " << ij->first;
+	}
+	throw runtime_error("no joint called `" + name + "'... try one of these:" + msg.str());
       }
       ROS_INFO ("adding joint `%s'", name.c_str());
       joint_map_[name] = controlled_joint_.size();
@@ -184,7 +191,7 @@ init(pr2_mechanism_model::RobotState * robot, ros::NodeHandle & nn)
     
   }
   
-  catch (exception const & ee) {
+  catch (std::exception const & ee) {
     ROS_ERROR ("DIController::init(): EXCEPTION: %s", ee.what());
     // cleanup?
     return false;
@@ -207,4 +214,4 @@ init(pr2_mechanism_model::RobotState * robot, ros::NodeHandle & nn)
 }
 
 
-PLUGINLIB_DECLARE_CLASS (dynamics_identification, DIController, DIController, pr2_controller_interface::Controller)
+PLUGINLIB_REGISTER_CLASS (DIController, DIController, pr2_controller_interface::Controller)

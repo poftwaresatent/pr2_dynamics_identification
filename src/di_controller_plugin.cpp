@@ -23,7 +23,10 @@
    \author Roland Philippsen
 */
 
+#include <pr2_controller_interface/controller.h>
 #include <pluginlib/class_list_macros.h>
+#include <XmlRpcValue.h>
+#include <XmlRpcException.h>
 
 using namespace std;
 
@@ -39,7 +42,7 @@ public:
   virtual bool init(pr2_mechanism_model::RobotState * robot, ros::NodeHandle &nn);
   
   uint64_t tick_;
-  std::vector<pr2_mechanism_model::JointState *> controlled_joint_;
+  vector<pr2_mechanism_model::JointState *> controlled_joint_;
 
   //  ros::Publisher _pub_;
   //  dynamics_identification:: _msg_;
@@ -113,7 +116,7 @@ init(pr2_mechanism_model::RobotState * robot, ros::NodeHandle & nn)
     
     controlled_joint_.clear();	// paranoid
     for (int ii(0); ii < joints_value.size(); ++ii) {
-      string const & name(static_cast<std::string const &>(joints_value[ii]));
+      string const & name(static_cast<string const &>(joints_value[ii]));
       pr2_mechanism_model::JointState * joint(robot->getJointState(name));
       if ( ! joint) {
 	throw runtime_error("no joint called `" + name + "'");
@@ -124,7 +127,7 @@ init(pr2_mechanism_model::RobotState * robot, ros::NodeHandle & nn)
     
   }
   
-  catch (std::exception const & ee) {
+  catch (exception const & ee) {
     ROS_ERROR ("DIController::init(): EXCEPTION: %s", ee.what());
     // cleanup?
     return false;

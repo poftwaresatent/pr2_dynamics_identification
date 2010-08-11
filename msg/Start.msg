@@ -1,0 +1,5 @@
+string joint_name
+float32 lower_position
+float32 upper_position
+float32 torque_magnitude
+uint16 chunksize

@@ -23,6 +23,8 @@
    \author Roland Philippsen
 */
 
+#include <dynamics_identification/Start.h>
+#include <dynamics_identification/Data.h>
 #include <pr2_controller_interface/controller.h>
 #include <pluginlib/class_list_macros.h>
 #include <XmlRpcValue.h>
@@ -41,17 +43,28 @@ public:
   virtual void update(void);
   virtual bool init(pr2_mechanism_model::RobotState * robot, ros::NodeHandle &nn);
   
+  void start_cb(dynamics_identification::Start::ConstPtr const & start);
+  
   uint64_t tick_;
+  size_t ndof_;
   vector<pr2_mechanism_model::JointState *> controlled_joint_;
-
-  //  ros::Publisher _pub_;
-  //  dynamics_identification:: _msg_;
+  map<string, size_t> joint_map_;
+  
+  ros::Subscriber start_sub_;
+  dynamics_identification::Start start_msg_;
+  ssize_t active_joint_index_;
+  ros::Time t0_;
+  
+  ros::Publisher data_pub_;
+  dynamics_identification::Data data_msg_;
 };
 
 
 DIController::
 DIController()
-  : tick_(0)
+  : tick_(0),
+    active_joint_index_(-1),
+    t0_(ros::Time::now())
 {
 }
 
@@ -63,35 +76,77 @@ DIController::
 
 
 void DIController::
+start_cb(dynamics_identification::Start::ConstPtr const & start)
+{
+  active_joint_index_ = -1;
+  
+  if (0 >= start->chunksize) {
+    ROS_ERROR ("DIController::start_cb(): invalid chunksize");
+    return;
+  }
+  
+  map<string, size_t>::const_iterator ij(joint_map_.find(start->joint_name));
+  if (ij == joint_map_.end()) {
+    ROS_ERROR ("DIController::start_cb(): invalid joint name `%s'", start->joint_name.c_str());
+    return;
+  }
+  
+  if (data_msg_.tick.size() != start->chunksize) {
+    data_msg_.tick.resize(start->chunksize);
+    data_msg_.milliseconds.resize(start->chunksize);
+    data_msg_.command_torque.resize(start->chunksize);
+    data_msg_.position.resize(start->chunksize);
+    data_msg_.velocity.resize(start->chunksize);
+    data_msg_.applied_torque.resize(start->chunksize);
+  }
+
+  start_msg_ = *start;
+  active_joint_index_ = ij->second;
+  tick_ = 0;
+  t0_ = ros::Time::now();
+}
+
+
+void DIController::
 update(void)
 {
-  bool ok(true);
-  size_t const ndof(controlled_joint_.size());
-  double blah(0);
+  ros::Duration const dt(ros::Time::now() - t0_);
   
-  for (size_t ii(0); ii < ndof; ++ii) {
-    blah = controlled_joint_[ii]->position_;
-    blah = controlled_joint_[ii]->velocity_;
-    blah = controlled_joint_[ii]->measured_effort_;
-  }
-  
-  double toto(0);
-  if (ok) {
-    for (size_t ii(0); ii < ndof; ++ii) {
-      controlled_joint_[ii]->commanded_effort_ = toto;
-    }
-  }
-  else {
-    for (size_t ii(0); ii < ndof; ++ii) {
+  if (0 > active_joint_index_ ) {
+    for (size_t ii(0); ii < ndof_; ++ii) {
       controlled_joint_[ii]->commanded_effort_ = 0;
+    }
+    return;
+  }
+  
+  size_t const data_index(tick_ % start_msg_.chunksize);
+  if ((0 == data_index) && (0 < tick_)) {
+    // publish previously populated message
+    data_pub_.publish(data_msg_);
+  }
+  
+  data_msg_.tick[data_index] = tick_;
+  data_msg_.milliseconds[data_index] = dt.toNSec() * 1e-6;
+  if (controlled_joint_[active_joint_index_]->position_ >= start_msg_.upper_position) {
+    data_msg_.command_torque[data_index] = - start_msg_.torque_magnitude;
+  }
+  if (controlled_joint_[active_joint_index_]->position_ <= start_msg_.lower_position) {
+    data_msg_.command_torque[data_index] = start_msg_.torque_magnitude;
+  }
+  data_msg_.position[data_index] = controlled_joint_[active_joint_index_]->position_;
+  data_msg_.velocity[data_index] = controlled_joint_[active_joint_index_]->velocity_;
+  data_msg_.applied_torque[data_index] = controlled_joint_[active_joint_index_]->measured_effort_;
+  
+  for (size_t ii(0); ii < ndof_; ++ii) {
+    if (static_cast<ssize_t>(ii) == active_joint_index_) {
+      controlled_joint_[ii]->commanded_effort_ = data_msg_.command_torque[data_index];
+    }
+    else {
+      controlled_joint_[ii]->commanded_effort_ = 0; // XXXX to do: PID on starting position
     }
   }
   
   ++tick_;
-  
-  // _msg_. = ;
-  // _pub_.publish(_msg_);
-  
 }
 
 
@@ -114,7 +169,8 @@ init(pr2_mechanism_model::RobotState * robot, ros::NodeHandle & nn)
       throw runtime_error("empty joint list");
     }
     
-    controlled_joint_.clear();	// paranoid
+    controlled_joint_.clear();
+    joint_map_.clear();
     for (int ii(0); ii < joints_value.size(); ++ii) {
       string const & name(static_cast<string const &>(joints_value[ii]));
       pr2_mechanism_model::JointState * joint(robot->getJointState(name));
@@ -122,6 +178,7 @@ init(pr2_mechanism_model::RobotState * robot, ros::NodeHandle & nn)
 	throw runtime_error("no joint called `" + name + "'");
       }
       ROS_INFO ("adding joint `%s'", name.c_str());
+      joint_map_[name] = controlled_joint_.size();
       controlled_joint_.push_back(joint);
     }
     
@@ -139,11 +196,15 @@ init(pr2_mechanism_model::RobotState * robot, ros::NodeHandle & nn)
     return false;
   }
   
-  // _pub_ = nn.advertise<dynamics_identification::>("", 100);
+  start_sub_ =
+    nn.subscribe<dynamics_identification::Start>("start", 1, &DIController::start_cb, this);
+  data_pub_ = nn.advertise<dynamics_identification::Data>("data", 100);
   
+  ndof_ = controlled_joint_.size();
+  active_joint_index_ = -1;
   ROS_INFO ("ready to rock");
   return true;
 }
 
 
-PLUGINLIB_REGISTER_CLASS (DIController, DIController, pr2_controller_interface::Controller)
+PLUGINLIB_DECLARE_CLASS (dynamics_identification, DIController, DIController, pr2_controller_interface::Controller)

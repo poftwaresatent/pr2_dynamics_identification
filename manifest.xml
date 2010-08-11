@@ -1,0 +1,17 @@
+<package>
+  <description brief="dynamics_identification">
+
+     dynamics_identification
+
+  </description>
+  <author>rolo</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/dynamics_identification</url>
+  <depend package="pr2_controller_interface"/>
+  <depend package="pluginlib"/>
+  <depend package="sensor_msgs"/>
+
+</package>
+
+

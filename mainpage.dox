@@ -2,25 +2,10 @@
 \mainpage
 \htmlinclude manifest.html
 
-\b dynamics_identification is ... 
-
-<!-- 
-Provide an overview of your package.
--->
-
-
-\section codeapi Code API
-
-<!--
-Provide links to specific auto-generated API documentation within your
-package that is of particular interest to a reader. Doxygen will
-document pretty much every part of your code, so do your best here to
-point the reader to the actual API.
-
-If your codebase is fairly large or has different sets of APIs, you
-should use the doxygen 'group' tag to keep these APIs together. For
-example, the roscpp documentation has 'libros' group.
--->
-
+Mostly based on gross simplifying assumptions, this set of tools
+should allow us to see whether we at least got the orders of magnitude
+right in the various parameters of the rigid dynamics model. Masses,
+centers of masses, and moments of inertia are the model parameters
+under consideration.
 
 */

@@ -1,17 +1,26 @@
 <package>
-  <description brief="dynamics_identification">
-
-     dynamics_identification
-
+  <description brief="Tools for estimating rigid-body dynamics of the robot.">
+    Mostly based on gross simplifying assumptions, this set of tools
+    should allow us to see whether we at least got the orders of
+    magnitude right in the various parameters of the rigid dynamics
+    model. Masses, centers of masses, and moments of inertia are the
+    model parameters under consideration.
   </description>
-  <author>rolo</author>
-  <license>BSD</license>
+  <author>Roland Philippsen</author>
+  <license>LGPLv3</license>
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/dynamics_identification</url>
   <depend package="pr2_controller_interface"/>
   <depend package="pluginlib"/>
   <depend package="sensor_msgs"/>
+  <export>
+    <pr2_controller_interface plugin="${prefix}/controller_plugins.xml" />
+    <!--
+       <cpp cflags="-I${prefix}/include" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/lib -l"/>
+       -->
+  </export>
+  <platform os="ubuntu" version="9.04"/>
+  <platform os="ubuntu" version="9.10"/>
+  <platform os="ubuntu" version="10.04"/>
 
 </package>
-
-

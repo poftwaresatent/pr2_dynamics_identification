@@ -1,0 +1,6 @@
+<library path="lib/libdi_controller_plugin">
+  <class
+      name="DIController"
+      type="DIController"
+      base_class_type="pr2_controller_interface::Controller" />
+</library>

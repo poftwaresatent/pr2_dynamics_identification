@@ -1,5 +1,5 @@
 dynamics_identification/Start measurement_parameters
-uint8 smoothing_range
+uint64 smoothing_range
 float32[] milliseconds
 float32[] measured_position
 float32[] measured_velocity

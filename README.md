@@ -19,8 +19,13 @@ Sketch of Test in Gazebo
    - note that the elbow flex joint behaves "weirdly" in Gazebo, hopefully
      it works better on the robot
 
-    rostopic pub -1 -- /di_controller/start dynamics_identification/Start l_shoulder_pan_joint -0.2 0.5 5 1
+    rostopic pub -1 -- /di_controller/start dynamics_identification/Start l_shoulder_pan_joint -0.2 0.5 5 61
 
-5. plot it
+5. start analysing the data published by the di_controller
 
-    rxplot /di_controller/data/position[0]:velocity[0]:command_torque[0]:applied_torque[0]
+    ./bin/di_analysis 30
+
+6. plot it
+
+    rxplot /di_analysis/analysis/measured_position[0]:estimated_position[0] /di_analysis/analysis/measured_velocity[0]:estimated_velocity[0] /di_analysis/analysis/estimated_acceleration[0] /di_analysis/analysis/inertia[0]
+

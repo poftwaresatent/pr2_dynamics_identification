@@ -27,6 +27,7 @@
 #include <dynamics_identification/Start.h>
 #include <dynamics_identification/Data.h>
 #include <dynamics_identification/Analysis.h>
+#include <err.h>
 
 #undef USE_SVD
 #ifndef USE_SVD
@@ -40,7 +41,7 @@ using namespace boost;
 
 static ros::Subscriber data_sub_;
 static ros::Publisher analysis_pub_;
-static uint8_t smoothing_range_(1);
+static size_t smoothing_range_(3);
 
 static void data_cb(shared_ptr<Data const> const & data);
 
@@ -48,6 +49,14 @@ int main(int argc, char*argv[])
 {
   ros::init(argc, argv, "di_analysis");
   ros::NodeHandle nn("~");
+  
+  if (argc > 1) {
+    int arg;
+    if ((1 != sscanf(argv[1], "%i", &arg)) || (0 >= arg)) {
+      errx(EXIT_FAILURE, "error reading argument `%s': positive number expected", argv[1]);
+    }
+    smoothing_range_ = arg;
+  }
   
   data_sub_ = nn.subscribe<Data>("/di_controller/data", 1, data_cb);
   analysis_pub_ = nn.advertise<Analysis>("analysis", 1);
@@ -97,12 +106,13 @@ void data_cb(shared_ptr<Data const> const & data)
     Eigen::VectorXd yy(regr_npoints);
     Eigen::MatrixXd XX(regr_npoints, 3);
     i_in = i_out;
+    double const t0(analysis_msg.milliseconds[i_out] * 1e-3);
     for (size_t i_regr(0); i_regr < regr_npoints; ++i_regr, ++i_in) {
       yy[i_regr] = data->position[i_in];
-      double const ss(data->milliseconds[i_in] * 1e-3);
+      double const ts((data->milliseconds[i_in] - analysis_msg.milliseconds[i_out]) * 1e-3);
       XX.coeffRef(i_regr, 0) = 1;
-      XX.coeffRef(i_regr, 1) = ss;
-      XX.coeffRef(i_regr, 2) = pow(ss, 2);
+      XX.coeffRef(i_regr, 1) = ts;
+      XX.coeffRef(i_regr, 2) = pow(ts, 2);
     }
     
 #ifndef USE_SVD
@@ -131,8 +141,8 @@ void data_cb(shared_ptr<Data const> const & data)
     analysis_msg.regression_0[i_out] = aa[0];
     analysis_msg.regression_1[i_out] = aa[1];
     analysis_msg.regression_2[i_out] = aa[2];
-    analysis_msg.estimated_position[i_out] = aa[0] + aa[1] * tnow + aa[2] * tnow*tnow;
-    analysis_msg.estimated_velocity[i_out] = aa[1] + 2 * aa[2] * tnow;
+    analysis_msg.estimated_position[i_out] = aa[0];
+    analysis_msg.estimated_velocity[i_out] = aa[1];
     analysis_msg.estimated_acceleration[i_out] = 2 * aa[2];
     analysis_msg.inertia[i_out] = analysis_msg.applied_torque[i_out] / 2 / aa[2];
   }

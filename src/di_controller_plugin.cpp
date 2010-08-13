@@ -81,6 +81,22 @@ DIController::
 void DIController::
 start_cb(dynamics_identification::Start::ConstPtr const & start)
 {
+  // Send out any leftover accumulated data
+  if ((0 <= active_joint_index_ ) // we're not idle
+      && (0 < tick_)		  // we've actually been updated
+      && (0 != tick_ % start_msg_.chunksize) // we've got something to send
+      ) {
+    size_t const partial_size(tick_ % start_msg_.chunksize);
+    data_msg_.tick.resize(partial_size);
+    data_msg_.milliseconds.resize(partial_size);
+    data_msg_.command_torque.resize(partial_size);
+    data_msg_.position.resize(partial_size);
+    data_msg_.velocity.resize(partial_size);
+    data_msg_.applied_torque.resize(partial_size);
+    data_pub_.publish(data_msg_);
+  }
+  
+  // Finished with current measurement.
   active_joint_index_ = -1;
   
   if (0 >= start->chunksize) {
@@ -102,7 +118,8 @@ start_cb(dynamics_identification::Start::ConstPtr const & start)
     data_msg_.velocity.resize(start->chunksize);
     data_msg_.applied_torque.resize(start->chunksize);
   }
-
+  
+  data_msg_.parameters = *start;
   start_msg_ = *start;
   active_joint_index_ = ij->second;
   tick_ = 0;

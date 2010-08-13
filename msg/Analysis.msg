@@ -1,0 +1,13 @@
+dynamics_identification/Start measurement_parameters
+uint8 smoothing_range
+float32[] milliseconds
+float32[] measured_position
+float32[] measured_velocity
+float32[] applied_torque
+float32[] regression_0
+float32[] regression_1
+float32[] regression_2
+float32[] estimated_position
+float32[] estimated_velocity
+float32[] estimated_acceleration
+float32[] inertia

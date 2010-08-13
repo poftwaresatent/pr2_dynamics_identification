@@ -269,35 +269,56 @@ processData(Data const & data)
   }
   
   size_t const datasize(data.applied_torque.size());
+  ROS_INFO ("processData(): datasize is %zu", datasize);
+  
   for (size_t at_start(0); at_start < datasize; /**/) {
     
-    float const at0(data.applied_torque[at_start]);
+    float at0(data.applied_torque[at_start]);
+    if (0 == at0) {
+      ROS_INFO ("processData(): skipping zero torque");
+      for (++at_start; at_start < datasize; ++at_start) {
+	at0 = data.applied_torque[at_start];
+	if (0 != at0) {
+	  break;
+	}
+      }
+      if (at_start >= datasize) {
+	ROS_INFO ("processData(): no non-zero torque left");
+	break;
+      }
+    }
+    ROS_INFO ("processData(): non-zero torque %g at index %zu", at0, at_start);
+    
     size_t at_change(at_start + 1);
     if (at0 > 0) {
       for (/**/; at_change < datasize; ++at_change) {
 	if (data.applied_torque[at_change] < 0) {
+	  ROS_INFO ("processData(): torque sign change at index %zu", at_change);
 	  break;
 	}
       }
     }
-    else {		    // XXXX potential for bug if at0 == 0
+    else {
       for (/**/; at_change < datasize; ++at_change) {
 	if (data.applied_torque[at_change] > 0) {
+	  ROS_INFO ("processData(): torque sign change at index %zu", at_change);
 	  break;
 	}
       }
     }
     
-    size_t const segment_length(at_change - at_start);
-    ROS_INFO ("processData(): buffering segment of length %zu", segment_length);
-    
-    buffer_->measured_milliseconds.resize(segment_length);
-    buffer_->measured_position.resize(segment_length);
-    buffer_->applied_torque.resize(segment_length);
-    size_t const nbytes(segment_length * sizeof(float));
-    memcpy(&buffer_->measured_milliseconds[0], &data.milliseconds[0], nbytes);
-    memcpy(&buffer_->measured_position[0], &data.position[0], nbytes);
-    memcpy(&buffer_->applied_torque[0], &data.applied_torque[0], nbytes);
+    ROS_INFO ("processData(): appending %zu entries to buffer of length %zu",
+	      at_change - at_start, buffer_->measured_milliseconds.size());
+    buffer_->measured_milliseconds.insert(buffer_->measured_milliseconds.end(),
+					  data.milliseconds.begin() + at_start,
+					  data.milliseconds.begin() + at_change);
+    buffer_->measured_position.insert(buffer_->measured_position.end(),
+				      data.position.begin() + at_start,
+				      data.position.begin() + at_change);
+    buffer_->applied_torque.insert(buffer_->applied_torque.end(),
+				   data.applied_torque.begin() + at_start,
+				   data.applied_torque.begin() + at_change);
+    ROS_INFO ("processData(): buffer grown to %zu entries", buffer_->measured_milliseconds.size());
     
     if (at_change < datasize) {
       // sign change within
@@ -396,8 +417,28 @@ processSegment(segment_data_s & segment)
   // not come from clean experiments, so let's at least flag such
   // segments as invalid).
   
-  double const vel0(segment.smoothed_velocity[0]);
+  double vel0(segment.smoothed_velocity[0]);
   size_t vel_change(1);
+  
+  // ...make sure to skip over leading zeroes...
+  if (0 == vel0) {
+    ROS_INFO ("processSegment(): skipping zero velocity");
+    size_t vel_start(1);
+    for (/**/; vel_start < smoothed_npoints; ++vel_start) {
+      vel0 = segment.smoothed_velocity[vel_start];
+      if (0 != vel0) {
+	break;
+      }
+    }
+    if (vel_start >= smoothed_npoints) {
+      ROS_ERROR ("processSegment(): no non-zero velocity, setup %zu, segment %zu",
+		 segment.setup_id, segment.segment_id);
+      return false;
+    }
+    ROS_INFO ("processSegment(): non-zero velocity %g at index %zu", vel0, vel_start);
+    vel_change = vel_start + 1;
+  }
+  
   if (vel0 > 0) {
     for (/**/; vel_change < smoothed_npoints; ++vel_change) {
       if (segment.smoothed_velocity[vel_change] < 0) {
@@ -406,7 +447,7 @@ processSegment(segment_data_s & segment)
       }
     }
   }
-  else {		    // XXXX potential for bug if vel0 == 0
+  else {
     for (/**/; vel_change < smoothed_npoints; ++vel_change) {
       if (segment.smoothed_velocity[vel_change] > 0) {
 	ROS_INFO ("processSegment(): zero crossing to >0 at %zu +offset", vel_change);
@@ -419,9 +460,11 @@ processSegment(segment_data_s & segment)
 	       segment.setup_id, segment.segment_id);
     return false;
   }
-
+  
   size_t second_vel_change(vel_change + 1);
-  if (vel0 > 0) {
+  // NOTE: invert the sign check (from `>' to `<') because we are
+  // looking for a transition back to the original sign!
+  if (vel0 < 0) {
     for (/**/; second_vel_change < smoothed_npoints; ++second_vel_change) {
       if (segment.smoothed_velocity[second_vel_change] < 0) {
 	ROS_INFO ("processSegment(): 2nd zero crossing to <0 at %zu +offset", second_vel_change);
@@ -429,7 +472,7 @@ processSegment(segment_data_s & segment)
       }
     }
   }
-  else {		    // XXXX potential for bug if vel0 == 0
+  else {
     for (/**/; second_vel_change < smoothed_npoints; ++second_vel_change) {
       if (segment.smoothed_velocity[second_vel_change] > 0) {
 	ROS_INFO ("processSegment(): 2nd zero crossing to >0 at %zu +offset", second_vel_change);
@@ -438,9 +481,20 @@ processSegment(segment_data_s & segment)
     }
   }
   if (second_vel_change < smoothed_npoints) {
+
+#define SECOND_CROSSING_IS_ERROR
+#ifdef SECOND_CROSSING_IS_ERROR
+
     ROS_ERROR ("smoothed velocity changes sign more than once, setup %zu, segment %zu",
 	       segment.setup_id, segment.segment_id);
     return false;
+
+#else // SECOND_CROSSING_IS_ERROR
+
+    ROS_WARN ("smoothed velocity changes sign more than once, setup %zu, segment %zu",
+	      segment.setup_id, segment.segment_id);
+
+#endif // SECOND_CROSSING_IS_ERROR
   }
   
   //////////////////////////////////////////////////
@@ -452,7 +506,7 @@ processSegment(segment_data_s & segment)
   segment.phase1_begin = 0;
   segment.phase1_end = vel_change + segment.smoothing_offset;
   segment.phase2_begin = segment.phase1_end;
-  segment.phase2_end = datasize;
+  segment.phase2_end = second_vel_change + segment.smoothing_offset; // == datasize most of the time
   
   return true;
 }

@@ -1,0 +1,16 @@
+bool valid
+uint64 setup_id
+uint64 segment_id
+float32[] measured_milliseconds
+float32[] measured_position
+float32[] applied_torque
+float32 average_applied_torque
+float32[] seconds
+uint64 smoothing_offset
+float32[] smoothed_position
+float32[] smoothed_velocity
+float32[] smoothed_acceleration
+uint64 phase1_begin
+uint64 phase1_end
+uint64 phase2_begin
+uint64 phase2_end

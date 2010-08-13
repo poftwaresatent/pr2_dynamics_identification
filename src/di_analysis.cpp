@@ -26,6 +26,7 @@
 #include <ros/ros.h>
 #include <dynamics_identification/Start.h>
 #include <dynamics_identification/Data.h>
+#include <dynamics_identification/Segment.h>
 #include <Eigen/LU>
 #include <err.h>
 
@@ -63,8 +64,44 @@ struct segment_data_s {
     : valid(false),
       setup_id(setup_id_),
       segment_id(segment_id_),
-      smoothing_offset(smoothing_offset_)
+      average_applied_torque(0),
+      smoothing_offset(smoothing_offset_),
+      phase1_begin(0),
+      phase1_end(0),
+      phase2_begin(0),
+      phase2_end(0)
   {
+  }
+  
+  inline void toMsg(Segment & msg) {
+    msg.valid = valid;
+    msg.setup_id = setup_id;
+    msg.segment_id = segment_id;
+    msg.measured_milliseconds = measured_milliseconds;
+    msg.measured_position = measured_position;
+    msg.applied_torque = applied_torque;
+    msg.average_applied_torque = average_applied_torque;
+    msg.seconds.clear();
+    msg.seconds.insert(msg.seconds.begin(),
+		       seconds.begin(),
+		       seconds.end());
+    msg.smoothing_offset = smoothing_offset;
+    msg.smoothed_position.clear();
+    msg.smoothed_position.insert(msg.smoothed_position.begin(),
+				 smoothed_position.begin(),
+				 smoothed_position.end());
+    msg.smoothed_velocity.clear();
+    msg.smoothed_velocity.insert(msg.smoothed_velocity.begin(),
+				 smoothed_velocity.begin(),
+				 smoothed_velocity.end());
+    msg.smoothed_acceleration.clear();
+    msg.smoothed_acceleration.insert(msg.smoothed_acceleration.begin(),
+				     smoothed_acceleration.begin(),
+				     smoothed_acceleration.end());
+    msg.phase1_begin = phase1_begin;
+    msg.phase1_end = phase1_end;
+    msg.phase2_begin = phase2_begin;
+    msg.phase2_end = phase2_end;
   }
   
   bool valid;
@@ -176,6 +213,7 @@ protected:
 
 
 static ros::Subscriber data_sub_;
+static ros::Publisher segment_pub_;
 //static ros::Publisher analysis_pub_;
 static shared_ptr<Segmentation> segmentation_;
 
@@ -199,6 +237,7 @@ int main(int argc, char*argv[])
   
   segmentation_.reset(new Segmentation(smoothing_range));
   data_sub_ = nn.subscribe<Data>("/di_controller/data", 1, data_cb);
+  segment_pub_ = nn.advertise<Segment>("segment", 100);
   //  analysis_pub_ = nn.advertise<Analysis>("analysis", 1);
   
   ros::spin();
@@ -210,6 +249,9 @@ void data_cb(shared_ptr<Data const> const & data)
   vector<segment_data_p> segments(segmentation_->processData(*data));
   for (vector<segment_data_p>::const_iterator is(segments.begin());
        is != segments.end(); ++is) {
+    Segment segment_msg;
+    (*is)->toMsg(segment_msg);
+    segment_pub_.publish(segment_msg);
     // analyse the segment...
   }
 }

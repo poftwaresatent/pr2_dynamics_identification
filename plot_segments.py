@@ -26,17 +26,12 @@ import rospy
 from dynamics_identification.msg import Segment
 
 import matplotlib
-matplotlib.use('GTKAgg') # do this before importing pylab
+matplotlib.use('GTKAgg')
 import matplotlib.pyplot as plt
 
 import gobject
 import threading
 import time
-
-mutex = threading.Lock()
-queue = list()
-figure = plt.figure()
-axes = figure.add_subplot(111)
 
 class Spinner(threading.Thread):
     def __init__(self):
@@ -49,15 +44,19 @@ def g_idle():
     global mutex, queue, figure, axes
     while not rospy.is_shutdown():
         mutex.acquire()
-        rospy.loginfo('g_idle(): %d segments in queue' % len(queue))
         for segment in queue:
             rospy.loginfo('g_idle(): setup %d, segment %d' % (segment.setup_id, segment.segment_id))
-            axes.plot(segment.measured_position)
-            figure.suptitle('measured position')
+            if segment.valid:
+                axes['valid pos'].plot(segment.measured_position)
+                axes['valid vel'].plot(segment.measured_velocity)
+            else:
+                axes['invalid pos'].plot(segment.measured_position)
+                axes['invalid vel'].plot(segment.measured_velocity)
             figure.canvas.draw()
         queue = list()
         mutex.release()
         time.sleep(0.5)
+    raise SystemExit
 
 def segment_cb(segment):
     global mutex, queue, figure, axes
@@ -67,6 +66,27 @@ def segment_cb(segment):
     mutex.release()
 
 if __name__ == '__main__':
+    global mutex, queue, figure, axes
+    mutex = threading.Lock()
+    queue = list()
+    figure = plt.figure()
+    axes = dict()
+    axes['valid pos'] = figure.add_subplot(221)
+    axes['valid pos'].set_title('valid')
+    axes['valid pos'].set_ylabel('position')
+    axes['valid pos'].set_xlabel('time')
+    axes['valid vel'] = figure.add_subplot(222)
+    axes['valid vel'].set_title('valid')
+    axes['valid vel'].set_ylabel('velocity')
+    axes['valid vel'].set_xlabel('time')
+    axes['invalid pos'] = figure.add_subplot(223)
+    axes['invalid pos'].set_title('invalid')
+    axes['invalid pos'].set_ylabel('position')
+    axes['invalid pos'].set_xlabel('time')
+    axes['invalid vel'] = figure.add_subplot(224)
+    axes['invalid vel'].set_title('invalid')
+    axes['invalid vel'].set_ylabel('velocity')
+    axes['invalid vel'].set_xlabel('time')
     rospy.init_node('plot_segments', anonymous = True)
     rospy.Subscriber('/di_analysis/segment', Segment, segment_cb)
     spinner = Spinner()

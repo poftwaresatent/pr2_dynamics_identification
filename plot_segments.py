@@ -47,15 +47,17 @@ class Spinner(threading.Thread):
 
 def g_idle():
     global mutex, queue, figure, axes
-    mutex.acquire()
-    for segment in queue:
-        rospy.loginfo('g_idle(): setup %d, segment %d' % (segment.setup_id, segment.segment_id))
-        axes.plot(segment.measured_position)
-        figure.suptitle('measured position')
-        figure.canvas.draw()
-    queue = list()
-    mutex.release()
-    time.sleep(0.1)
+    while not rospy.is_shutdown():
+        mutex.acquire()
+        rospy.loginfo('g_idle(): %d segments in queue' % len(queue))
+        for segment in queue:
+            rospy.loginfo('g_idle(): setup %d, segment %d' % (segment.setup_id, segment.segment_id))
+            axes.plot(segment.measured_position)
+            figure.suptitle('measured position')
+            figure.canvas.draw()
+        queue = list()
+        mutex.release()
+        time.sleep(0.5)
 
 def segment_cb(segment):
     global mutex, queue, figure, axes

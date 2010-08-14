@@ -79,6 +79,7 @@ struct segment_data_s {
     msg.segment_id = segment_id;
     msg.measured_milliseconds = measured_milliseconds;
     msg.measured_position = measured_position;
+    msg.measured_velocity = measured_velocity;
     msg.applied_torque = applied_torque;
     msg.average_applied_torque = average_applied_torque;
     msg.seconds.clear();
@@ -111,6 +112,7 @@ struct segment_data_s {
   // from Data msg
   vector<float> measured_milliseconds;
   vector<float> measured_position;
+  vector<float> measured_velocity;
   vector<float> applied_torque;
   double average_applied_torque;
   
@@ -357,6 +359,9 @@ processData(Data const & data)
     buffer_->measured_position.insert(buffer_->measured_position.end(),
 				      data.position.begin() + at_start,
 				      data.position.begin() + at_change);
+    buffer_->measured_velocity.insert(buffer_->measured_velocity.end(),
+				      data.velocity.begin() + at_start,
+				      data.velocity.begin() + at_change);
     buffer_->applied_torque.insert(buffer_->applied_torque.end(),
 				   data.applied_torque.begin() + at_start,
 				   data.applied_torque.begin() + at_change);

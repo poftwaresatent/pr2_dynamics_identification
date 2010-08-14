@@ -3,6 +3,7 @@ uint64 setup_id
 uint64 segment_id
 float32[] measured_milliseconds
 float32[] measured_position
+float32[] measured_velocity
 float32[] applied_torque
 float32 average_applied_torque
 float32[] seconds

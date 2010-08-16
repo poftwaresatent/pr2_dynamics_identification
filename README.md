@@ -21,11 +21,11 @@ Sketch of Test in Gazebo
 
     rostopic pub -1 -- /di_controller/start dynamics_identification/Start l_shoulder_pan_joint -0.2 0.5 5 61
 
-5. start analysing the data published by the di_controller
+5. start segmenting the data published by the di_controller
 
-    ./bin/di_analysis 30
+    ./bin/di_segmentation 30
 
 6. plot it
 
-    rxplot /di_analysis/analysis/measured_position[0]:estimated_position[0] /di_analysis/analysis/measured_velocity[0]:estimated_velocity[0] /di_analysis/analysis/estimated_acceleration[0] /di_analysis/analysis/inertia[0]
+    rxplot /di_segmentation/segment/measured_position[0]:estimated_position[0] /di_segmentation/segment/measured_velocity[0]:estimated_velocity[0] /di_segmentation/segment/estimated_acceleration[0] /di_segmentation/segment/inertia[0]
 

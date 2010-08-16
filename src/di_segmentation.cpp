@@ -19,7 +19,7 @@
  */
 
 /**
-   \file di_analysis.cpp
+   \file di_segmentation.cpp
    \author Roland Philippsen
 */
 
@@ -225,7 +225,7 @@ static void data_cb(shared_ptr<Data const> const & data);
 
 int main(int argc, char*argv[])
 {
-  ros::init(argc, argv, "di_analysis");
+  ros::init(argc, argv, "di_segmentation");
   ros::NodeHandle nn("~");
   
   size_t smoothing_range(30);

@@ -14,5 +14,6 @@ rosbuild_genmsg ()
 
 rosbuild_add_library (di_controller_plugin src/di_controller_plugin.cpp)
 
-rosbuild_add_executable (di_analysis src/di_analysis.cpp)
+rosbuild_add_executable (di_segmentation src/di_segmentation.cpp)
+##rosbuild_add_executable (di_analysis src/di_analysis.cpp)
 #target_link_libraries ()

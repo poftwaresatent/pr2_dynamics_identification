@@ -88,7 +88,7 @@ if __name__ == '__main__':
     axes['invalid vel'].set_ylabel('velocity')
     axes['invalid vel'].set_xlabel('time')
     rospy.init_node('plot_segments', anonymous = True)
-    rospy.Subscriber('/di_analysis/segment', Segment, segment_cb)
+    rospy.Subscriber('/di_segmentation/segment', Segment, segment_cb)
     spinner = Spinner()
     spinner.start()
     gobject.idle_add(g_idle)

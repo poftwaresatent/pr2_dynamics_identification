@@ -11,7 +11,5 @@ uint64 smoothing_offset
 float32[] smoothed_position
 float32[] smoothed_velocity
 float32[] smoothed_acceleration
-uint64 phase1_begin
-uint64 phase1_end
-uint64 phase2_begin
-uint64 phase2_end
+uint64[] phase_begin
+uint64[] phase_end

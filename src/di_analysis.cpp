@@ -34,43 +34,6 @@ using namespace boost;
 using namespace std;
 
 
-struct analysis_s {
-  size_t setup_id;
-  size_t segment_id;
-  
-  // regression of x = A * exp(-t) + B * t + C
-  // stored as phaseX_a[0] == A  phaseX_a[1] == B  phaseX_a[2] == C
-  Eigen::Vector3d phase1_a;
-  Eigen::Vector3d phase2_a;
-  
-  // B_minus is the B parameter of the phase where velocity < 0 and
-  // B_plus where it is > 0
-  double B_minus;
-  double B_plus;
-  
-  // Estimated friction coefficients, assuming a simple static +
-  // viscous model of the form f_actual = f_applied + f_static +
-  // f_viscous where f_static = - sign(vel) * coeff_static and
-  // f_viscous = - coeff_viscous * vel
-  double friction_static;
-  double friction_viscous;
-  
-  double estimated_inertia;
-  
-  // Estimated position, velocity, and acceleration, based on the
-  // exponential curve fit, and estimated actual torque and resulting
-  // inertia based on the friction model.
-  vector<double> phase1_position;
-  vector<double> phase1_velocity;
-  vector<double> phase1_acceleration;
-  vector<double> phase1_actual_torque;
-  vector<double> phase2_position;
-  vector<double> phase2_velocity;
-  vector<double> phase2_acceleration;
-  vector<double> phase2_actual_torque;
-};
-
-
 static ros::Subscriber segment_sub_;
 static ros::Publisher analysis_pub_;
 
@@ -92,5 +55,143 @@ int main(int argc, char*argv[])
 
 void segment_cb(shared_ptr<Segment const> const & segment)
 {
-  //analysis_pub_.publish(analysis_msg);
+  //////////////////////////////////////////////////
+  // sanity checks
+  
+  size_t const ndata(segment->measured_milliseconds.size());
+  if ((ndata != segment->measured_position.size())
+      || (ndata != segment->seconds.size())
+      || (segment->phase_begin.size() != 2)
+      || (segment->phase_end.size() != 2)
+      || (segment->phase_end[1] > ndata)
+      || (segment->phase_end[1] <= segment->phase_begin[1])
+      || (segment->phase_end[0] <= segment->phase_begin[0])
+      || (fabs(segment->average_applied_torque) < 1e-6)
+      || segment->smoothed_velocity.empty()) {
+    ROS_ERROR ("segment_cb(): inconsistent segment data");
+    return;
+  }
+  
+  //////////////////////////////////////////////////
+  // fit exponential curve onto each phase:
+  // regression of x = A * exp(-t) + B * t + C
+  // stored as aa[0] == A  aa[1] == B  aa[2] == C
+  
+  Eigen::VectorXd aa[2];
+  for (size_t i_phase(0); i_phase < 2; ++i_phase) {
+    size_t const npoints(segment->phase_end[i_phase] - segment->phase_begin[i_phase]);
+    Eigen::VectorXd yy(npoints);
+    Eigen::MatrixXd XX(npoints, 3);
+    double const t0(segment->seconds[segment->phase_begin[i_phase]]);
+    size_t i_regr(0);
+    size_t i_in(segment->phase_begin[i_phase]);
+    for (/**/; i_regr < npoints; ++i_regr, ++i_in) {
+      yy[i_regr] = segment->measured_position[i_in];
+      double const ts(segment->seconds[i_in] - t0);
+      XX.coeffRef(i_regr, 0) = exp(-ts);
+      XX.coeffRef(i_regr, 1) = ts;
+      XX.coeffRef(i_regr, 2) = 1;
+    }
+    Eigen::MatrixXd toto(XX.transpose() * XX);
+    aa[i_phase] = toto.inverse() * XX.transpose() * yy;
+  }
+  
+  //////////////////////////////////////////////////
+  // estimate static and viscous friction:
+  // B_minus is the B parameter of the phase where velocity < 0
+  // and B_plus where it is > 0
+  
+  double B_minus;
+  double B_plus;
+  if (segment->smoothed_velocity[0] > 0) {
+    B_minus = aa[1].coeff(1);
+    B_plus = aa[0].coeff(1);
+  }
+  else {
+    B_minus = aa[0].coeff(1);
+    B_plus = aa[1].coeff(1);
+  }
+  double const
+    static_friction(segment->average_applied_torque * (B_minus - B_plus) / (B_minus + B_plus));
+  if (static_friction < 0) {
+    ROS_ERROR ("segment_cb(): unexpected static_friction = %g", static_friction);
+    return;
+  }
+  double const B_bar((B_minus + B_plus) / 2);
+  if (fabs(B_bar) < 1e-6) {
+    ROS_ERROR ("segment_cb(): unexpected B_bar = %g", B_bar);
+    return;
+  }
+  double const viscous_friction(segment->average_applied_torque / B_bar);
+  if (viscous_friction < 0) {
+    ROS_ERROR ("segment_cb(): unexpected viscous_friction = %g", viscous_friction);
+    return;
+  }
+  
+  //later// //////////////////////////////////////////////////
+  //later// // estimated inertia
+  
+  //later// double const inertia(...);
+  
+  //////////////////////////////////////////////////
+  // let's see what the fit looks like
+  
+  Analysis analysis_msg;
+  analysis_msg.setup_id = segment->setup_id;
+  analysis_msg.segment_id = segment->segment_id;
+  analysis_msg.measured_position = segment->measured_position;
+  analysis_msg.average_applied_torque = segment->average_applied_torque;
+  analysis_msg.seconds = segment->seconds;
+  analysis_msg.estimated_position.resize(ndata);
+  analysis_msg.estimated_velocity.resize(ndata);
+  analysis_msg.estimated_acceleration.resize(ndata);
+  analysis_msg.estimated_actual_torque.resize(ndata);
+  
+  for (size_t i_phase(0); i_phase < 2; ++i_phase) {
+    double const t0(segment->seconds[segment->phase_begin[i_phase]]);
+    double const AA(aa[i_phase].coeff(0));
+    double const BB(aa[i_phase].coeff(1));
+    double const CC(aa[i_phase].coeff(2));
+    double f_static;
+    if (segment->smoothed_velocity[segment->phase_begin[i_phase]] > 0) {
+      f_static = - static_friction;
+    }
+    else {
+      f_static =   static_friction;
+    }
+    for (size_t i_point(segment->phase_begin[i_phase]);
+	 i_point < segment->phase_end[i_phase]; ++i_point) {
+      double const ts(segment->seconds[i_point] - t0);
+      double const ae(AA * exp(-ts));
+      analysis_msg.estimated_position[i_point] =       ae + BB * ts + CC;
+      analysis_msg.estimated_velocity[i_point] =      -ae + BB;
+      analysis_msg.estimated_acceleration[i_point] =   ae;
+      analysis_msg.estimated_actual_torque[i_point] =
+	analysis_msg.average_applied_torque
+	+ f_static
+	- analysis_msg.estimated_velocity[i_point] * viscous_friction;
+    }
+  }
+  
+  // fill in zeros in case there are gaps before/between/after the phases...
+  for (size_t ii(0); ii < segment->phase_begin[0]; ++ii) {
+    analysis_msg.estimated_position[ii] = 0;
+    analysis_msg.estimated_velocity[ii] = 0;
+    analysis_msg.estimated_acceleration[ii] = 0;
+    analysis_msg.estimated_actual_torque[ii] = 0;
+  }
+  for (size_t ii(segment->phase_end[0]); ii < segment->phase_begin[1]; ++ii) {
+    analysis_msg.estimated_position[ii] = 0;
+    analysis_msg.estimated_velocity[ii] = 0;
+    analysis_msg.estimated_acceleration[ii] = 0;
+    analysis_msg.estimated_actual_torque[ii] = 0;
+  }
+  for (size_t ii(segment->phase_end[1]); ii < ndata; ++ii) {
+    analysis_msg.estimated_position[ii] = 0;
+    analysis_msg.estimated_velocity[ii] = 0;
+    analysis_msg.estimated_acceleration[ii] = 0;
+    analysis_msg.estimated_actual_torque[ii] = 0;
+  }
+  
+  analysis_pub_.publish(analysis_msg);
 }

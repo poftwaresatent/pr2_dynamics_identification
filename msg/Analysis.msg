@@ -3,20 +3,12 @@ uint64 segment_id
 float32[] measured_position
 float32 average_applied_torque
 float32[] seconds
-uint64 phase1_begin
-uint64 phase1_end
-uint64 phase2_begin
-uint64 phase2_end
-float32 Aplus
-float32 Bplus
-float32 Cplus
-float32 Aminus
-float32 Bminus
-float32 Cminus
-float32 static_friction
-float32 viscous_friction
+### uint64[] phase_begin
+### uint64[] phase_end
+### float32 static_friction
+### float32 viscous_friction
 float32[] estimated_position
 float32[] estimated_velocity
 float32[] estimated_acceleration
 float32[] estimated_actual_torque
-float32 estimated_inertia
+### float32 estimated_inertia

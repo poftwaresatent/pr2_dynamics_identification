@@ -99,10 +99,12 @@ struct segment_data_s {
     msg.smoothed_acceleration.insert(msg.smoothed_acceleration.begin(),
 				     smoothed_acceleration.begin(),
 				     smoothed_acceleration.end());
-    msg.phase1_begin = phase1_begin;
-    msg.phase1_end = phase1_end;
-    msg.phase2_begin = phase2_begin;
-    msg.phase2_end = phase2_end;
+    msg.phase_begin.resize(2);
+    msg.phase_begin[0] = phase1_begin;
+    msg.phase_begin[1] = phase2_begin;
+    msg.phase_end.resize(2);
+    msg.phase_end[0] = phase1_end;
+    msg.phase_end[1] = phase2_end;
   }
   
   bool valid;

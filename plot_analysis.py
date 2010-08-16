@@ -23,7 +23,7 @@ import roslib
 roslib.load_manifest('dynamics_identification')
 
 import rospy
-from dynamics_identification.msg import Segment
+from dynamics_identification.msg import Analysis
 
 import matplotlib
 matplotlib.use('GTKAgg')
@@ -44,25 +44,21 @@ def g_idle():
     global mutex, queue, figure, axes
     while not rospy.is_shutdown():
         mutex.acquire()
-        for segment in queue:
-            rospy.loginfo('g_idle(): setup %d, segment %d' % (segment.setup_id, segment.segment_id))
-            if segment.valid:
-                axes['valid pos'].plot(segment.measured_position)
-                axes['valid vel'].plot(segment.measured_velocity)
-            else:
-                axes['invalid pos'].plot(segment.measured_position)
-                axes['invalid vel'].plot(segment.measured_velocity)
+        for analysis in queue:
+            rospy.loginfo('g_idle(): setup %d, segment %d' % (analysis.setup_id, analysis.segment_id))
+            axes['measured'].plot(analysis.measured_position)
+            axes['estimated'].plot(analysis.estimated_position)
             figure.canvas.draw()
         queue = list()
         mutex.release()
         time.sleep(0.2)
     raise SystemExit
 
-def segment_cb(segment):
+def analysis_cb(analysis):
     global mutex, queue, figure, axes
-    rospy.loginfo('segment_cb(): setup %d, segment %d' % (segment.setup_id, segment.segment_id))
+    rospy.loginfo('analysis_cb(): setup %d, segment %d' % (analysis.setup_id, analysis.segment_id))
     mutex.acquire()
-    queue.append(segment)
+    queue.append(analysis)
     mutex.release()
 
 if __name__ == '__main__':
@@ -71,24 +67,14 @@ if __name__ == '__main__':
     queue = list()
     figure = plt.figure()
     axes = dict()
-    axes['valid pos'] = figure.add_subplot(221)
-    axes['valid pos'].set_title('valid')
-    axes['valid pos'].set_ylabel('position')
-    axes['valid pos'].set_xlabel('time')
-    axes['valid vel'] = figure.add_subplot(222)
-    axes['valid vel'].set_title('valid')
-    axes['valid vel'].set_ylabel('velocity')
-    axes['valid vel'].set_xlabel('time')
-    axes['invalid pos'] = figure.add_subplot(223)
-    axes['invalid pos'].set_title('invalid')
-    axes['invalid pos'].set_ylabel('position')
-    axes['invalid pos'].set_xlabel('time')
-    axes['invalid vel'] = figure.add_subplot(224)
-    axes['invalid vel'].set_title('invalid')
-    axes['invalid vel'].set_ylabel('velocity')
-    axes['invalid vel'].set_xlabel('time')
-    rospy.init_node('plot_segments', anonymous = True)
-    rospy.Subscriber('/di_segmentation/segment', Segment, segment_cb)
+    axes['measured'] = figure.add_subplot(211)
+    axes['measured'].set_ylabel('measured')
+    axes['measured'].set_xlabel('time')
+    axes['estimated'] = figure.add_subplot(212)
+    axes['estimated'].set_ylabel('estimated')
+    axes['estimated'].set_xlabel('time')
+    rospy.init_node('plot_analysiss', anonymous = True)
+    rospy.Subscriber('/di_analysis/analysis', Analysis, analysis_cb)
     spinner = Spinner()
     spinner.start()
     gobject.idle_add(g_idle)

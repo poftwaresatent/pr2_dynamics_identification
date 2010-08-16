@@ -7,4 +7,17 @@
       args="di_controller"
       output="screen">
   </node>
+  <node
+      pkg="dynamics_identification"
+      type="di_segmentation"
+      name="di_segmentation"
+      args="30"
+      output="screen">
+  </node>
+  <node
+      pkg="dynamics_identification"
+      type="di_analysis"
+      name="di_analysis"
+      output="screen">
+  </node>
 </launch>

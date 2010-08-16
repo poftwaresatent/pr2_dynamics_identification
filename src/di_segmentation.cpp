@@ -140,43 +140,6 @@ struct segment_data_s {
 };
 
 
-struct segment_analysis_s {
-  size_t setup_id;
-  size_t segment_id;
-  
-  // regression of x = A * exp(-t) + B * t + C
-  // stored as phaseX_a[0] == A  phaseX_a[1] == B  phaseX_a[2] == C
-  Eigen::Vector3d phase1_a;
-  Eigen::Vector3d phase2_a;
-  
-  // B_minus is the B parameter of the phase where velocity < 0 and
-  // B_plus where it is > 0
-  double B_minus;
-  double B_plus;
-  
-  // Estimated friction coefficients, assuming a simple static +
-  // viscous model of the form f_actual = f_applied + f_static +
-  // f_viscous where f_static = - sign(vel) * coeff_static and
-  // f_viscous = - coeff_viscous * vel
-  double friction_static;
-  double friction_viscous;
-  
-  // Estimated position, velocity, and acceleration, based on the
-  // exponential curve fit, and estimated actual torque and resulting
-  // inertia based on the friction model.
-  vector<double> phase1_position;
-  vector<double> phase1_velocity;
-  vector<double> phase1_acceleration;
-  vector<double> phase1_actual_torque;
-  vector<double> phase1_inertia;
-  vector<double> phase2_position;
-  vector<double> phase2_velocity;
-  vector<double> phase2_acceleration;
-  vector<double> phase2_actual_torque;
-  vector<double> phase2_inertia;
-};
-
-
 typedef shared_ptr<setup_s> setup_p;
 typedef shared_ptr<segment_data_s> segment_data_p;
 
@@ -216,7 +179,6 @@ protected:
 
 static ros::Subscriber data_sub_;
 static ros::Publisher segment_pub_;
-//static ros::Publisher analysis_pub_;
 static shared_ptr<Segmentation> segmentation_;
 
 
@@ -240,7 +202,6 @@ int main(int argc, char*argv[])
   segmentation_.reset(new Segmentation(smoothing_range));
   data_sub_ = nn.subscribe<Data>("/di_controller/data", 1, data_cb);
   segment_pub_ = nn.advertise<Segment>("segment", 100);
-  //  analysis_pub_ = nn.advertise<Analysis>("analysis", 1);
   
   ros::spin();
 }
@@ -254,7 +215,6 @@ void data_cb(shared_ptr<Data const> const & data)
     Segment segment_msg;
     (*is)->toMsg(segment_msg);
     segment_pub_.publish(segment_msg);
-    // analyse the segment...
   }
 }
 
